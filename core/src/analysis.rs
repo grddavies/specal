@@ -19,6 +19,36 @@ use crate::{DbRange, Error, MAX_FFT_BITS, MIN_FFT_BITS, Palette, Rgba, Settings}
 /// Power floor, so silence gives a finite value (-200 dB) instead of -inf.
 const MIN_POWER: f32 = 1e-20;
 
+/// Column bounds for [`Columns::Auto`]. The minimum keeps short files smooth
+/// (columns then overlap, like Spek at wide window sizes); the maximum bounds
+/// memory (8192 × 1025 bands × 4 bytes ≈ 34 MB) and stays within common GPU
+/// texture limits.
+pub const MIN_AUTO_COLUMNS: usize = 4096;
+pub const MAX_AUTO_COLUMNS: usize = 8192;
+
+/// How many time columns to compute.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Columns {
+  /// Exactly this many, e.g. one per output pixel.
+  Exact(usize),
+  /// One per FFT window, within [`MIN_AUTO_COLUMNS`]..=[`MAX_AUTO_COLUMNS`].
+  /// Analyse once at this resolution, then [`Spectrogram::rebin`] to fit the
+  /// display as it resizes.
+  Auto,
+}
+
+impl Columns {
+  fn resolve(self, frames: u64, fft_bits: u32) -> usize {
+    match self {
+      Self::Exact(n) => n,
+      Self::Auto => {
+        let windows = (frames >> fft_bits) as usize;
+        windows.clamp(MIN_AUTO_COLUMNS, MAX_AUTO_COLUMNS).min(frames as usize)
+      }
+    }
+  }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum WindowFunction {
   #[default]
@@ -70,17 +100,51 @@ impl Spectrogram {
     &self.data[column * self.bands..(column + 1) * self.bands]
   }
 
+  /// Average down to `columns` columns, each the mean of the source columns it
+  /// covers. Returns an unchanged copy if `columns` isn't smaller; let the
+  /// display stretch it instead.
+  pub fn rebin(&self, columns: usize) -> Spectrogram {
+    let columns = columns.max(1);
+    if columns >= self.columns {
+      return self.clone();
+    }
+    let mut data = Vec::with_capacity(columns * self.bands);
+    let mut sum = vec![0.0f32; self.bands];
+    for x in 0..columns {
+      let start = x * self.columns / columns;
+      let end = (x + 1) * self.columns / columns;
+      sum.fill(0.0);
+      for src in start..end {
+        for (s, &v) in sum.iter_mut().zip(self.column(src)) {
+          *s += v;
+        }
+      }
+      let count = (end - start) as f32;
+      data.extend(sum.iter().map(|s| s / count));
+    }
+    Spectrogram { columns, bands: self.bands, data }
+  }
+
   /// Render to an image `columns` wide and `bands` tall, highest frequency at the top.
   pub fn to_rgba(&self, palette: Palette, range: DbRange) -> Rgba {
     let (w, h) = (self.columns, self.bands);
-    let span = range.upper - range.lower;
+    // The palette maths is too slow to run per pixel; 1024 steps is finer
+    // than 8-bit colour can show.
+    const STEPS: usize = 1024;
+    let lut: Vec<[u8; 4]> = (0..STEPS)
+      .map(|i| {
+        let [r, g, b] = palette.color(i as f32 / (STEPS - 1) as f32);
+        [r, g, b, 255]
+      })
+      .collect();
+    let scale = (STEPS - 1) as f32 / (range.upper - range.lower);
+
     let mut pixels = vec![0u8; w * h * 4];
     for x in 0..w {
       for (band, &db) in self.column(x).iter().enumerate() {
-        let level = ((db - range.lower) / span).clamp(0.0, 1.0);
-        let [r, g, b] = palette.color(level);
+        let step = ((db - range.lower) * scale).clamp(0.0, (STEPS - 1) as f32) as usize;
         let i = ((h - 1 - band) * w + x) * 4;
-        pixels[i..i + 4].copy_from_slice(&[r, g, b, 255]);
+        pixels[i..i + 4].copy_from_slice(&lut[step]);
       }
     }
     Rgba { width: w as u32, height: h as u32, pixels }
@@ -101,10 +165,10 @@ impl Analysis {
   }
 }
 
-/// Decode `path` and compute a spectrogram `columns` wide.
+/// Decode `path` and compute its spectrogram.
 ///
 /// This blocks until the whole file has been decoded; run it off the UI thread.
-pub fn analyse(path: &Path, settings: &Settings, columns: usize) -> Result<Analysis, Error> {
+pub fn analyse(path: &Path, settings: &Settings, columns: Columns) -> Result<Analysis, Error> {
   analyse_cancellable(path, settings, columns, &AtomicBool::new(false))
 }
 
@@ -112,17 +176,18 @@ pub fn analyse(path: &Path, settings: &Settings, columns: usize) -> Result<Analy
 pub fn analyse_cancellable(
   path: &Path,
   settings: &Settings,
-  columns: usize,
+  columns: Columns,
   cancel: &AtomicBool,
 ) -> Result<Analysis, Error> {
   if !(MIN_FFT_BITS..=MAX_FFT_BITS).contains(&settings.fft_bits) {
     return Err(Error::FftSize);
   }
-  if columns == 0 {
+  if columns == Columns::Exact(0) {
     return Err(Error::NoColumns);
   }
 
   let mut decoder = Decoder::open(path, settings.channel)?;
+  let columns = columns.resolve(decoder.info.frames, settings.fft_bits);
   let mut acc = Accumulator::new(settings, columns, decoder.info.frames);
   while let Some(samples) = decoder.next_chunk()? {
     if cancel.load(Ordering::Relaxed) {
@@ -288,6 +353,29 @@ mod tests {
       let peak = (0..col.len()).max_by(|&a, &b| col[a].total_cmp(&col[b])).unwrap();
       assert_eq!(peak, expected_band, "column {x}");
     }
+  }
+
+  #[test]
+  fn rebin_averages_covered_columns() {
+    let spec = Spectrogram { columns: 4, bands: 2, data: vec![0.0, 10.0, 2.0, 20.0, 4.0, 30.0, 6.0, 40.0] };
+    let half = spec.rebin(2);
+    assert_eq!(half.columns, 2);
+    assert_eq!(half.data, [1.0, 15.0, 5.0, 35.0]);
+    // Uneven: 4 → 3 covers [0], [1], [2, 3].
+    assert_eq!(spec.rebin(3).data, [0.0, 10.0, 2.0, 20.0, 5.0, 35.0]);
+    // Growing is left to the display.
+    assert_eq!(spec.rebin(10).columns, 4);
+  }
+
+  #[test]
+  fn auto_columns() {
+    // 4 minutes at 44.1 kHz with 2048-sample windows: one column per window.
+    assert_eq!(Columns::Auto.resolve(240 * 44_100, 11), 240 * 44_100 / 2048);
+    // Short files get the minimum, long ones the maximum.
+    assert_eq!(Columns::Auto.resolve(44_100, 11), MIN_AUTO_COLUMNS);
+    assert_eq!(Columns::Auto.resolve(3600 * 44_100, 11), MAX_AUTO_COLUMNS);
+    // Never more columns than samples.
+    assert_eq!(Columns::Auto.resolve(100, 11), 100);
   }
 
   #[test]

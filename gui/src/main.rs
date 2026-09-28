@@ -13,7 +13,7 @@ use iced::{
   event, font, mouse, window,
 };
 use specal_core::layout::{self, Layout};
-use specal_core::{Analysis, DbRange, Palette, Settings, analyse_cancellable, ticks};
+use specal_core::{Analysis, Columns, DbRange, Palette, Settings, analyse_cancellable, ticks};
 
 /// Rough glyph width as a fraction of font size, for spacing time labels.
 const CHAR_WIDTH: f32 = 0.6;
@@ -34,14 +34,18 @@ enum Message {
   HoverLeft,
   FileDropped(PathBuf),
   Resized(Size),
-  Analysed(u64, Result<Loaded, String>),
+  Rescaled(f32),
+  Analysed(u64, Result<Arc<Analysis>, String>),
 }
 
-/// A finished analysis, ready to draw.
-#[derive(Debug, Clone)]
+/// A finished analysis and the image currently made from it.
 struct Loaded {
+  /// Full resolution, kept so resizes only need a re-bin, not a new analysis.
   analysis: Arc<Analysis>,
+  /// `analysis.spectrogram` re-binned to the plot's width in physical pixels.
   spectrogram: image::Handle,
+  /// Width `spectrogram` was made for, to skip re-binning when it hasn't changed.
+  columns: usize,
 }
 
 struct App {
@@ -49,6 +53,8 @@ struct App {
   palette: Palette,
   range: DbRange,
   window_size: Size,
+  /// Physical pixels per logical pixel: 2.0 on Retina screens.
+  scale_factor: f32,
   hovering: bool,
   path: Option<PathBuf>,
   loaded: Option<Loaded>,
@@ -57,8 +63,6 @@ struct App {
   /// Bumped on every new analysis so stale results are ignored.
   generation: u64,
   cancel: Arc<AtomicBool>,
-  /// Columns in the current (or in-flight) analysis, to spot resizes that need a new one.
-  columns: usize,
   bar: image::Handle,
   cache: canvas::Cache,
 }
@@ -72,6 +76,7 @@ impl App {
       palette,
       range: DbRange::default(),
       window_size: INITIAL_SIZE,
+      scale_factor: 1.0,
       hovering: false,
       path: None,
       loaded: None,
@@ -79,16 +84,16 @@ impl App {
       error: None,
       generation: 0,
       cancel: Arc::new(AtomicBool::new(false)),
-      columns: 0,
       bar: image::Handle::from_rgba(bar.width, bar.height, bar.pixels),
       cache: canvas::Cache::new(),
     };
+    let scale_factor = window::latest().and_then(window::scale_factor).map(Message::Rescaled);
     // `specal-gui some-file.flac` opens it straight away.
-    let task = match std::env::args_os().nth(1) {
+    let open = match std::env::args_os().nth(1) {
       Some(path) => app.open(PathBuf::from(path)),
       None => Task::none(),
     };
-    (app, task)
+    (app, Task::batch([scale_factor, open]))
   }
 
   fn title(&self) -> String {
@@ -104,48 +109,66 @@ impl App {
       Event::Window(window::Event::FilesHoveredLeft) => Some(Message::HoverLeft),
       Event::Window(window::Event::FileDropped(path)) => Some(Message::FileDropped(path)),
       Event::Window(window::Event::Resized(size)) => Some(Message::Resized(size)),
+      Event::Window(window::Event::Rescaled(factor)) => Some(Message::Rescaled(factor)),
       _ => None,
     })
   }
 
   fn update(&mut self, message: Message) -> Task<Message> {
     match message {
-      Message::FileHovered => {
-        self.hovering = true;
-        Task::none()
-      }
-      Message::HoverLeft => {
-        self.hovering = false;
-        Task::none()
-      }
+      Message::FileHovered => self.hovering = true,
+      Message::HoverLeft => self.hovering = false,
       Message::FileDropped(path) => {
         self.hovering = false;
-        self.open(path)
+        return self.open(path);
       }
       Message::Resized(size) => {
         self.window_size = size;
-        // Like Spek, re-analyse when the plot width changes so columns stay 1:1 with pixels.
-        if self.path.is_some() && Layout::new(size.width, size.height).columns() != self.columns {
-          self.start_analysis()
-        } else {
-          Task::none()
-        }
+        self.fit_image();
+      }
+      Message::Rescaled(factor) => {
+        self.scale_factor = factor;
+        self.fit_image();
       }
       Message::Analysed(generation, result) => {
         if generation == self.generation {
           self.analysing = false;
           match result {
-            Ok(loaded) => {
-              self.loaded = Some(loaded);
+            Ok(analysis) => {
               self.error = None;
+              self.loaded = Some(self.make_image(analysis));
             }
             Err(e) => self.error = Some(e),
           }
           self.cache.clear();
         }
-        Task::none()
       }
     }
+    Task::none()
+  }
+
+  /// Plot width in physical pixels: one spectrogram column per screen pixel.
+  fn wanted_columns(&self) -> usize {
+    let plot = Layout::new(self.window_size.width, self.window_size.height).plot;
+    (plot.width * self.scale_factor).floor() as usize
+  }
+
+  /// Re-bin the loaded analysis if the plot's pixel width has changed.
+  fn fit_image(&mut self) {
+    if let Some(loaded) = self.loaded.take() {
+      self.loaded = Some(if loaded.columns == self.wanted_columns() {
+        loaded
+      } else {
+        self.cache.clear();
+        self.make_image(loaded.analysis)
+      });
+    }
+  }
+
+  fn make_image(&self, analysis: Arc<Analysis>) -> Loaded {
+    let columns = self.wanted_columns();
+    let rgba = analysis.spectrogram.rebin(columns).to_rgba(self.palette, self.range);
+    Loaded { spectrogram: image::Handle::from_rgba(rgba.width, rgba.height, rgba.pixels), analysis, columns }
   }
 
   fn open(&mut self, path: PathBuf) -> Task<Message> {
@@ -158,32 +181,21 @@ impl App {
   /// Cancel any running analysis and start a new one on a background thread.
   fn start_analysis(&mut self) -> Task<Message> {
     let Some(path) = self.path.clone() else { return Task::none() };
-    let columns = Layout::new(self.window_size.width, self.window_size.height).columns();
-    if columns == 0 {
-      return Task::none();
-    }
 
     self.cancel.store(true, Ordering::Relaxed);
     let cancel = Arc::new(AtomicBool::new(false));
     self.cancel = cancel.clone();
     self.generation += 1;
-    self.columns = columns;
     self.analysing = true;
 
     let generation = self.generation;
-    let (settings, palette, range) = (self.settings.clone(), self.palette, self.range);
+    let settings = self.settings.clone();
     Task::perform(
       async move {
         let (tx, rx) = oneshot::channel();
         std::thread::spawn(move || {
-          let result = analyse_cancellable(&path, &settings, columns, &cancel).map(|analysis| {
-            let rgba = analysis.spectrogram.to_rgba(palette, range);
-            Loaded {
-              analysis: Arc::new(analysis),
-              spectrogram: image::Handle::from_rgba(rgba.width, rgba.height, rgba.pixels),
-            }
-          });
-          let _ = tx.send(result.map_err(|e| e.to_string()));
+          let result = analyse_cancellable(&path, &settings, Columns::Auto, &cancel);
+          let _ = tx.send(result.map(Arc::new).map_err(|e| e.to_string()));
         });
         rx.await.unwrap_or_else(|_| Err("analysis thread stopped unexpectedly".to_owned()))
       },

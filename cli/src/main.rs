@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use anyhow::{Context, Result, bail};
 use clap::{Parser, ValueEnum};
 use specal_core::layout::Layout;
-use specal_core::{DbRange, Palette, Settings, WindowFunction, svg};
+use specal_core::{Columns, DbRange, Palette, Settings, WindowFunction, svg};
 
 /// Render an audio file's spectrogram.
 ///
@@ -87,7 +87,7 @@ fn main() -> Result<()> {
   let range = DbRange { lower: args.lower, upper: args.upper };
 
   let columns = if is_png { args.width as usize } else { Layout::new(args.width as f32, args.height as f32).columns() };
-  let analysis = specal_core::analyse(&args.input, &settings, columns)
+  let analysis = specal_core::analyse(&args.input, &settings, Columns::Exact(columns))
     .with_context(|| format!("analysing {}", args.input.display()))?;
 
   if is_png {

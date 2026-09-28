@@ -15,7 +15,9 @@ pub mod ticks;
 
 use std::path::PathBuf;
 
-pub use analysis::{Analysis, Spectrogram, WindowFunction, analyse, analyse_cancellable};
+pub use analysis::{
+  Analysis, Columns, MAX_AUTO_COLUMNS, MIN_AUTO_COLUMNS, Spectrogram, WindowFunction, analyse, analyse_cancellable,
+};
 pub use audio::AudioInfo;
 pub use palette::Palette;
 
