@@ -10,14 +10,19 @@ use iced::widget::canvas::{self, Frame, Geometry, Stroke};
 use iced::widget::{Canvas, center, container, image, stack, text};
 use iced::{
   Border, Color, Element, Event, Fill, Font, Pixels, Point, Rectangle, Renderer, Size, Subscription, Task, Theme,
-  event, font, mouse, window,
+  event, font, keyboard, mouse, window,
 };
 use specal_core::layout::{self, Layout};
-use specal_core::{Analysis, Columns, DbRange, Palette, Settings, analyse_cancellable, ticks};
+use specal_core::{
+  Analysis, Columns, DbRange, MAX_FFT_BITS, MIN_FFT_BITS, Palette, Settings, WindowFunction, analyse_cancellable, ticks,
+};
 
 /// Rough glyph width as a fraction of font size, for spacing time labels.
 const CHAR_WIDTH: f32 = 0.6;
 const INITIAL_SIZE: Size = Size::new(1200.0, 700.0);
+/// Limits for the dB range keys, as in Spek.
+const MIN_DB: f32 = -140.0;
+const MAX_DB: f32 = 0.0;
 
 pub fn main() -> iced::Result {
   iced::application(App::boot, App::update, App::view)
@@ -36,6 +41,41 @@ enum Message {
   Resized(Size),
   Rescaled(f32),
   Analysed(u64, Result<Arc<Analysis>, String>),
+  /// A Spek keyboard shortcut: lower case steps forward (+1), Shift steps back (-1).
+  Adjust(Setting, i32),
+  /// `Esc`: put the dB limits back to their defaults.
+  ResetDb,
+}
+
+/// Settings with Spek's single-letter keys.
+#[derive(Debug, Clone, Copy)]
+enum Setting {
+  /// `c`
+  Channel,
+  /// `f`
+  Window,
+  /// `l`
+  LowerDb,
+  /// `p`
+  Palette,
+  /// `u`
+  UpperDb,
+  /// `w`
+  FftSize,
+}
+
+impl Setting {
+  fn from_key(key: &str) -> Option<Self> {
+    Some(match key {
+      "c" => Self::Channel,
+      "f" => Self::Window,
+      "l" => Self::LowerDb,
+      "p" => Self::Palette,
+      "u" => Self::UpperDb,
+      "w" => Self::FftSize,
+      _ => return None,
+    })
+  }
 }
 
 /// A finished analysis and the image currently made from it.
@@ -110,6 +150,15 @@ impl App {
       Event::Window(window::Event::FileDropped(path)) => Some(Message::FileDropped(path)),
       Event::Window(window::Event::Resized(size)) => Some(Message::Resized(size)),
       Event::Window(window::Event::Rescaled(factor)) => Some(Message::Rescaled(factor)),
+      Event::Keyboard(keyboard::Event::KeyPressed { key: keyboard::Key::Character(key), modifiers, .. })
+        if !modifiers.command() && !modifiers.alt() =>
+      {
+        let setting = Setting::from_key(key.to_lowercase().as_str())?;
+        Some(Message::Adjust(setting, if modifiers.shift() { -1 } else { 1 }))
+      }
+      Event::Keyboard(keyboard::Event::KeyPressed {
+        key: keyboard::Key::Named(keyboard::key::Named::Escape), ..
+      }) => Some(Message::ResetDb),
       _ => None,
     })
   }
@@ -143,8 +192,62 @@ impl App {
           self.cache.clear();
         }
       }
+      Message::Adjust(setting, step) => return self.adjust(setting, step),
+      Message::ResetDb => {
+        if self.range != DbRange::default() {
+          self.range = DbRange::default();
+          self.recolour();
+        }
+      }
     }
     Task::none()
+  }
+
+  /// Apply a Spek shortcut. Colour-only changes re-colour the existing analysis;
+  /// the rest need a new one.
+  fn adjust(&mut self, setting: Setting, step: i32) -> Task<Message> {
+    let before = self.settings.clone();
+    match setting {
+      Setting::Channel => {
+        let Some(channels) = self.loaded.as_ref().map(|l| l.analysis.info.channels) else { return Task::none() };
+        self.settings.channel = cycle(self.settings.channel, channels, step);
+      }
+      Setting::Window => {
+        let all = WindowFunction::ALL;
+        let i = all.iter().position(|w| *w == self.settings.window).unwrap_or(0);
+        self.settings.window = all[cycle(i, all.len(), step)];
+      }
+      Setting::FftSize => {
+        self.settings.fft_bits = self.settings.fft_bits.saturating_add_signed(step).clamp(MIN_FFT_BITS, MAX_FFT_BITS);
+      }
+      Setting::Palette => {
+        let all = Palette::ALL;
+        let i = all.iter().position(|p| *p == self.palette).unwrap_or(0);
+        self.palette = all[cycle(i, all.len(), step)];
+        let bar = self.palette.bar(256);
+        self.bar = image::Handle::from_rgba(bar.width, bar.height, bar.pixels);
+        self.recolour();
+      }
+      Setting::LowerDb => {
+        let r = &mut self.range;
+        r.lower = if step > 0 { (r.lower + 1.0).min(r.upper - 1.0) } else { (r.lower - 1.0).max(MIN_DB) };
+        self.recolour();
+      }
+      Setting::UpperDb => {
+        let r = &mut self.range;
+        r.upper = if step > 0 { (r.upper + 1.0).min(MAX_DB) } else { (r.upper - 1.0).max(r.lower + 1.0) };
+        self.recolour();
+      }
+    }
+    if self.settings != before { self.start_analysis() } else { Task::none() }
+  }
+
+  /// Rebuild the image after a palette or dB range change.
+  fn recolour(&mut self) {
+    if let Some(loaded) = self.loaded.take() {
+      self.loaded = Some(self.make_image(loaded.analysis));
+    }
+    self.cache.clear();
   }
 
   /// Plot width in physical pixels: one spectrogram column per screen pixel.
@@ -353,4 +456,9 @@ fn to_rect(r: layout::Rect) -> Rectangle {
 
 fn file_name(path: &Path) -> String {
   path.file_name().unwrap_or(path.as_os_str()).to_string_lossy().into_owned()
+}
+
+/// Step `index` by `step` through `len` items, wrapping around.
+fn cycle(index: usize, len: usize, step: i32) -> usize {
+  (index as i64 + step as i64).rem_euclid(len.max(1) as i64) as usize
 }

@@ -4,11 +4,11 @@ A Rust re-implementation of [Spek](https://github.com/alexkay/spek), the acousti
 
 ## Layout
 
-| Crate | Path | What it does |
-|---|---|---|
+| Crate         | Path    | What it does                                                                                                                |
+| ------------- | ------- | --------------------------------------------------------------------------------------------------------------------------- |
 | `specal-core` | `core/` | Decoding (symphonia), FFT (realfft), palettes, axis ticks, page layout. No GUI code. Optional `svg` feature for SVG export. |
-| `specal` | `cli/` | Command line: audio file in, SVG (with axes) or PNG (bare spectrogram) out. |
-| `specal-gui` | `gui/` | iced window: drop an audio file on it. |
+| `specal`      | `cli/`  | Command line: audio file in, SVG (with axes) or PNG (bare spectrogram) out.                                                 |
+| `specal-gui`  | `gui/`  | iced window: drop an audio file on it.                                                                                      |
 
 ## Usage
 
@@ -20,6 +20,18 @@ cargo run --release -p specal -- --help                         # palette, windo
 cargo run --release -p specal-gui                               # then drag a file onto the window
 cargo run --release -p specal-gui -- track.flac                 # or open one directly
 ```
+
+### GUI keys
+
+| Key       | Changes                                          |             |
+| --------- | ------------------------------------------------ | ----------- |
+| `c` / `C` | Audio channel                                    | re-analyses |
+| `f` / `F` | Window function (Hann, Hamming, Blackman–Harris) | re-analyses |
+| `w` / `W` | FFT window size (256 to 16384)                   | re-analyses |
+| `p` / `P` | Palette (Spectrum, SoX, Mono)                    | instant     |
+| `l` / `L` | Lower dB limit (down to -140)                    | instant     |
+| `u` / `U` | Upper dB limit (up to 0)                         | instant     |
+| `Esc`     | Reset the dB limits to -120 and 0                | instant     |
 
 ## Tests
 
