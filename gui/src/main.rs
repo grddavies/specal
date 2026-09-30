@@ -9,18 +9,19 @@ use iced::futures::channel::oneshot;
 use iced::widget::canvas::{self, Frame, Geometry, Stroke};
 use iced::widget::{Canvas, center, container, image, stack, text};
 use iced::{
-  Border, Color, Element, Event, Fill, Font, Pixels, Point, Rectangle, Renderer, Size, Subscription, Task, Theme,
-  event, font, keyboard, mouse, window,
+  Border, Color, Element, Event, Fill, Font, Pixels, Point, Rectangle, Renderer, Size,
+  Subscription, Task, Theme, event, font, keyboard, mouse, window,
 };
 use specal_core::layout::{self, Layout};
 use specal_core::{
-  Analysis, Columns, DbRange, MAX_FFT_BITS, MIN_FFT_BITS, Palette, Settings, WindowFunction, analyse_cancellable, ticks,
+  Analysis, Columns, DbRange, MAX_FFT_BITS, MIN_FFT_BITS, Palette, Settings, WindowFunction,
+  analyse_cancellable, ticks,
 };
 
 /// Rough glyph width as a fraction of font size, for spacing time labels.
 const CHAR_WIDTH: f32 = 0.6;
 const INITIAL_SIZE: Size = Size::new(1200.0, 700.0);
-/// Limits for the dB range keys, as in Spek.
+/// Limits for the dB range keys.
 const MIN_DB: f32 = -140.0;
 const MAX_DB: f32 = 0.0;
 
@@ -41,30 +42,24 @@ enum Message {
   Resized(Size),
   Rescaled(f32),
   Analysed(u64, Result<Arc<Analysis>, String>),
-  /// A Spek keyboard shortcut: lower case steps forward (+1), Shift steps back (-1).
+  /// A keyboard shortcut: lower case steps forward (+1), Shift steps back (-1).
   Adjust(Setting, i32),
   /// `Esc`: put the dB limits back to their defaults.
   ResetDb,
 }
 
-/// Settings with Spek's single-letter keys.
 #[derive(Debug, Clone, Copy)]
 enum Setting {
-  /// `c`
   Channel,
-  /// `f`
   Window,
-  /// `l`
   LowerDb,
-  /// `p`
   Palette,
-  /// `u`
   UpperDb,
-  /// `w`
   FftSize,
 }
 
 impl Setting {
+  /// Get a setting from a single character key
   fn from_key(key: &str) -> Option<Self> {
     Some(match key {
       "c" => Self::Channel,
@@ -150,14 +145,17 @@ impl App {
       Event::Window(window::Event::FileDropped(path)) => Some(Message::FileDropped(path)),
       Event::Window(window::Event::Resized(size)) => Some(Message::Resized(size)),
       Event::Window(window::Event::Rescaled(factor)) => Some(Message::Rescaled(factor)),
-      Event::Keyboard(keyboard::Event::KeyPressed { key: keyboard::Key::Character(key), modifiers, .. })
-        if !modifiers.command() && !modifiers.alt() =>
-      {
+      Event::Keyboard(keyboard::Event::KeyPressed {
+        key: keyboard::Key::Character(key),
+        modifiers,
+        ..
+      }) if !modifiers.command() && !modifiers.alt() => {
         let setting = Setting::from_key(key.to_lowercase().as_str())?;
         Some(Message::Adjust(setting, if modifiers.shift() { -1 } else { 1 }))
       }
       Event::Keyboard(keyboard::Event::KeyPressed {
-        key: keyboard::Key::Named(keyboard::key::Named::Escape), ..
+        key: keyboard::Key::Named(keyboard::key::Named::Escape),
+        ..
       }) => Some(Message::ResetDb),
       _ => None,
     })
@@ -203,13 +201,14 @@ impl App {
     Task::none()
   }
 
-  /// Apply a Spek shortcut. Colour-only changes re-colour the existing analysis;
-  /// the rest need a new one.
+  /// Apply a keyboard shortcut.
   fn adjust(&mut self, setting: Setting, step: i32) -> Task<Message> {
     let before = self.settings.clone();
     match setting {
       Setting::Channel => {
-        let Some(channels) = self.loaded.as_ref().map(|l| l.analysis.info.channels) else { return Task::none() };
+        let Some(channels) = self.loaded.as_ref().map(|l| l.analysis.info.channels) else {
+          return Task::none();
+        };
         self.settings.channel = cycle(self.settings.channel, channels, step);
       }
       Setting::Window => {
@@ -218,7 +217,8 @@ impl App {
         self.settings.window = all[cycle(i, all.len(), step)];
       }
       Setting::FftSize => {
-        self.settings.fft_bits = self.settings.fft_bits.saturating_add_signed(step).clamp(MIN_FFT_BITS, MAX_FFT_BITS);
+        self.settings.fft_bits =
+          self.settings.fft_bits.saturating_add_signed(step).clamp(MIN_FFT_BITS, MAX_FFT_BITS);
       }
       Setting::Palette => {
         let all = Palette::ALL;
@@ -230,12 +230,14 @@ impl App {
       }
       Setting::LowerDb => {
         let r = &mut self.range;
-        r.lower = if step > 0 { (r.lower + 1.0).min(r.upper - 1.0) } else { (r.lower - 1.0).max(MIN_DB) };
+        r.lower =
+          if step > 0 { (r.lower + 1.0).min(r.upper - 1.0) } else { (r.lower - 1.0).max(MIN_DB) };
         self.recolour();
       }
       Setting::UpperDb => {
         let r = &mut self.range;
-        r.upper = if step > 0 { (r.upper + 1.0).min(MAX_DB) } else { (r.upper - 1.0).max(r.lower + 1.0) };
+        r.upper =
+          if step > 0 { (r.upper + 1.0).min(MAX_DB) } else { (r.upper - 1.0).max(r.lower + 1.0) };
         self.recolour();
       }
     }
@@ -271,7 +273,11 @@ impl App {
   fn make_image(&self, analysis: Arc<Analysis>) -> Loaded {
     let columns = self.wanted_columns();
     let rgba = analysis.spectrogram.rebin(columns).to_rgba(self.palette, self.range);
-    Loaded { spectrogram: image::Handle::from_rgba(rgba.width, rgba.height, rgba.pixels), analysis, columns }
+    Loaded {
+      spectrogram: image::Handle::from_rgba(rgba.width, rgba.height, rgba.pixels),
+      analysis,
+      columns,
+    }
   }
 
   fn open(&mut self, path: PathBuf) -> Task<Message> {
@@ -308,9 +314,10 @@ impl App {
 
   fn view(&self) -> Element<'_, Message> {
     let content: Element<'_, Message> = match (&self.loaded, &self.path) {
-      (Some(loaded), Some(path)) => {
-        Canvas::new(Plot { app: self, loaded, title: file_name(path) }).width(Fill).height(Fill).into()
-      }
+      (Some(loaded), Some(path)) => Canvas::new(Plot { app: self, loaded, title: file_name(path) })
+        .width(Fill)
+        .height(Fill)
+        .into(),
       _ => {
         let message = match (&self.error, self.analysing) {
           (Some(e), _) => format!("Cannot analyse this file: {e}"),
@@ -334,17 +341,23 @@ impl App {
     if self.hovering {
       layers = layers.push(center(text("Drop to analyse").size(20)).style(|_| container::Style {
         background: Some(Color { a: 0.7, ..Color::BLACK }.into()),
-        border: Border { color: Color::from_rgb8(0x4c, 0x9a, 0xff), width: 3.0, radius: 0.0.into() },
+        border: Border {
+          color: Color::from_rgb8(0x4c, 0x9a, 0xff),
+          width: 3.0,
+          radius: 0.0.into(),
+        },
         text_color: Some(Color::WHITE),
         ..Default::default()
       }));
     }
 
-    container(layers).style(|_| container::Style { background: Some(Color::BLACK.into()), ..Default::default() }).into()
+    container(layers)
+      .style(|_| container::Style { background: Some(Color::BLACK.into()), ..Default::default() })
+      .into()
   }
 }
 
-/// Draws the spectrogram with Spek's axes, header and colour bar.
+/// Draws the spectrogram with axes, header and colour bar.
 struct Plot<'a> {
   app: &'a App,
   loaded: &'a Loaded,
@@ -391,13 +404,22 @@ impl canvas::Program<Message> for Plot<'_> {
       frame.stroke_rectangle(plot.position(), plot.size(), stroke);
 
       let label_height = layout::LABEL_SIZE * 1.2;
-      let time_label_width = ticks::TIME_SAMPLE_LABEL.len() as f32 * layout::LABEL_SIZE * CHAR_WIDTH;
+      let time_label_width =
+        ticks::TIME_SAMPLE_LABEL.len() as f32 * layout::LABEL_SIZE * CHAR_WIDTH;
 
       for t in ticks::time(info.duration, plot.width, time_label_width) {
         let x = plot.x + t.pos * plot.width;
         let y = plot.y + plot.height;
         line(frame, (x, y), (x, y + layout::TICK), stroke);
-        label(frame, &t.label, (x, y + layout::GAP), layout::LABEL_SIZE, Font::DEFAULT, Align::Center, Vertical::Top);
+        label(
+          frame,
+          &t.label,
+          (x, y + layout::GAP),
+          layout::LABEL_SIZE,
+          Font::DEFAULT,
+          Align::Center,
+          Vertical::Top,
+        );
       }
       for t in ticks::frequency(info.sample_rate, plot.height, label_height) {
         let y = plot.y + plot.height - t.pos * plot.height;
@@ -416,7 +438,15 @@ impl canvas::Program<Message> for Plot<'_> {
         let x = bar.x + bar.width;
         let y = bar.y + bar.height - t.pos * bar.height;
         line(frame, (x, y), (x + layout::TICK, y), stroke);
-        label(frame, &t.label, (x + layout::GAP, y), layout::LABEL_SIZE, Font::DEFAULT, Align::Start, Vertical::Center);
+        label(
+          frame,
+          &t.label,
+          (x + layout::GAP, y),
+          layout::LABEL_SIZE,
+          Font::DEFAULT,
+          Align::Start,
+          Vertical::Center,
+        );
       }
     });
     vec![geometry]
@@ -429,7 +459,15 @@ enum Align {
   End,
 }
 
-fn label(frame: &mut Frame, content: &str, at: (f32, f32), size: f32, font: Font, align_x: Align, align_y: Vertical) {
+fn label(
+  frame: &mut Frame,
+  content: &str,
+  at: (f32, f32),
+  size: f32,
+  font: Font,
+  align_x: Align,
+  align_y: Vertical,
+) {
   frame.fill_text(canvas::Text {
     content: content.to_owned(),
     position: Point::new(at.0, at.1),

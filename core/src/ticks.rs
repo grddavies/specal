@@ -1,4 +1,4 @@
-//! Where to put axis ticks and what to label them, ported from Spek's ruler.
+//! Where to put axis ticks and what to label them
 //!
 //! These functions only do the maths; drawing is up to the front end. Each
 //! takes the axis length in pixels and the extent of a typical label along the
@@ -14,7 +14,7 @@ pub struct Tick {
   pub label: String,
 }
 
-/// Representative labels for measuring, as Spek uses.
+/// Representative labels for measuring
 pub const TIME_SAMPLE_LABEL: &str = "00:00";
 pub const FREQUENCY_SAMPLE_LABEL: &str = "00 kHz";
 pub const DB_SAMPLE_LABEL: &str = "-00 dB";
@@ -28,7 +28,10 @@ pub fn time(duration_secs: f64, axis_px: f32, label_extent: f32) -> Vec<Tick> {
   let max = duration_secs as i64;
   let scale = axis_px / duration_secs as f32;
   ruler(0, max, FACTORS, 1.5, scale, label_extent)
-    .map(|s| Tick { pos: s as f32 / duration_secs as f32, label: format!("{}:{:02}", s / 60, s % 60) })
+    .map(|s| Tick {
+      pos: s as f32 / duration_secs as f32,
+      label: format!("{}:{:02}", s / 60, s % 60),
+    })
     .collect()
 }
 
@@ -47,8 +50,7 @@ pub fn frequency(sample_rate: u32, axis_px: f32, label_extent: f32) -> Vec<Tick>
 
 /// dB ticks for the palette bar, counting down from `upper` (at the top).
 pub fn db(range: crate::DbRange, axis_px: f32, label_extent: f32) -> Vec<Tick> {
-  // Work in attenuation units (0, 10, 20, ...) so ticks are round numbers
-  // counted from the top, as in Spek.
+  // Work in attenuation units (0, 10, 20, ...) so ticks are round numbers.
   let min = -range.upper.round() as i64;
   let max = -range.lower.round() as i64;
   if max <= min {
@@ -61,9 +63,9 @@ pub fn db(range: crate::DbRange, axis_px: f32, label_extent: f32) -> Vec<Tick> {
     .collect()
 }
 
-/// Spek's tick selection: always the two ends, plus multiples of the smallest
-/// factor that leaves `spacing` label-lengths between ticks, stopping before a
-/// tick would crowd the far end.
+/// Tick selection: always the two ends, plus multiples of the smallest factor
+/// that leaves `spacing` label-lengths between ticks, stopping before a tick
+/// would crowd the far end.
 fn ruler(
   min: i64,
   max: i64,
@@ -72,7 +74,8 @@ fn ruler(
   px_per_unit: f32,
   label_extent: f32,
 ) -> impl Iterator<Item = i64> {
-  let factor = factors.iter().copied().find(|&f| (px_per_unit * f as f32).abs() >= spacing * label_extent);
+  let factor =
+    factors.iter().copied().find(|&f| (px_per_unit * f as f32).abs() >= spacing * label_extent);
   let middle = factor.into_iter().flat_map(move |f| {
     (1..)
       .map(move |k| min + k * f)
@@ -96,8 +99,8 @@ mod tests {
     assert_eq!(
       labels(&ticks),
       [
-        "0 kHz", "2 kHz", "4 kHz", "6 kHz", "8 kHz", "10 kHz", "12 kHz", "14 kHz", "16 kHz", "18 kHz", "20 kHz",
-        "22 kHz"
+        "0 kHz", "2 kHz", "4 kHz", "6 kHz", "8 kHz", "10 kHz", "12 kHz", "14 kHz", "16 kHz",
+        "18 kHz", "20 kHz", "22 kHz"
       ]
     );
     assert_eq!(ticks[0].pos, 0.0);

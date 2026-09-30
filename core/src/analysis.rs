@@ -1,8 +1,8 @@
 //! Short-time FFT over the whole file, reduced to a fixed number of columns.
 //!
-//! Like Spek, the file is split into `columns` equal intervals. Each interval
-//! gets one FFT per full window it contains (or one FFT of the most recent
-//! samples if it's shorter than a window), and the dB results are averaged.
+//! The file is split into `columns` equal intervals. Each interval gets one FFT
+//! per full window it contains (or one FFT of the most recent samples if it's
+//! shorter than a window), and the dB results are averaged.
 
 use std::f32::consts::PI;
 use std::fmt;
@@ -19,10 +19,9 @@ use crate::{DbRange, Error, MAX_FFT_BITS, MIN_FFT_BITS, Palette, Rgba, Settings}
 /// Power floor, so silence gives a finite value (-200 dB) instead of -inf.
 const MIN_POWER: f32 = 1e-20;
 
-/// Column bounds for [`Columns::Auto`]. The minimum keeps short files smooth
-/// (columns then overlap, like Spek at wide window sizes); the maximum bounds
-/// memory (8192 × 1025 bands × 4 bytes ≈ 34 MB) and stays within common GPU
-/// texture limits.
+/// Column bounds for [`Columns::Auto`]. The minimum keeps short files smooth;
+/// the maximum bounds memory (8192 × 1025 bands × 4 bytes ≈ 34 MB) and stays
+/// within common GPU texture limits.
 pub const MIN_AUTO_COLUMNS: usize = 4096;
 pub const MAX_AUTO_COLUMNS: usize = 8192;
 
@@ -128,10 +127,12 @@ impl Spectrogram {
   /// Render to an image `columns` wide and `bands` tall, highest frequency at the top.
   pub fn to_rgba(&self, palette: Palette, range: DbRange) -> Rgba {
     let (w, h) = (self.columns, self.bands);
-    // The palette maths is too slow to run per pixel; 1024 steps is finer
-    // than 8-bit colour can show.
+    // The palette maths is too slow to run per pixel, so precompute a lookup table.
+    // 1024 steps is finer than the 256 levels per channel of 8-bit colour.
     const STEPS: usize = 1024;
-    let lut: Vec<[u8; 4]> = (0..STEPS)
+    // bytes per pixel, RGBA
+    const BPP: usize = 4;
+    let lut: Vec<[u8; BPP]> = (0..STEPS)
       .map(|i| {
         let [r, g, b] = palette.color(i as f32 / (STEPS - 1) as f32);
         [r, g, b, 255]
@@ -139,12 +140,12 @@ impl Spectrogram {
       .collect();
     let scale = (STEPS - 1) as f32 / (range.upper - range.lower);
 
-    let mut pixels = vec![0u8; w * h * 4];
+    let mut pixels = vec![0u8; w * h * BPP];
     for x in 0..w {
       for (band, &db) in self.column(x).iter().enumerate() {
         let step = ((db - range.lower) * scale).clamp(0.0, (STEPS - 1) as f32) as usize;
-        let i = ((h - 1 - band) * w + x) * 4;
-        pixels[i..i + 4].copy_from_slice(&lut[step]);
+        let i = ((h - 1 - band) * w + x) * BPP;
+        pixels[i..i + BPP].copy_from_slice(&lut[step]);
       }
     }
     Rgba { width: w as u32, height: h as u32, pixels }

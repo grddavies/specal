@@ -22,7 +22,7 @@ pub struct AudioInfo {
   /// Bits per sample, for lossless codecs that report it.
   pub bits_per_sample: Option<u32>,
   /// Average bit rate in bits per second, estimated from the file size.
-  /// Only set when `bits_per_sample` is not (i.e. for lossy codecs), like Spek.
+  /// Only set when `bits_per_sample` is not (i.e. for lossy codecs).
   pub bit_rate: Option<u32>,
   /// Duration in seconds.
   pub duration: f64,
@@ -31,11 +31,12 @@ pub struct AudioInfo {
 }
 
 impl AudioInfo {
-  /// Spek-style one-line description, e.g.
+  /// One-line description, e.g.
   /// `"Free Lossless Audio Codec, 44100 Hz, 16 bits, channel 1 / 2, W:2048, F:Hann"`.
   pub fn description(&self, settings: &crate::Settings) -> String {
     let mut items = vec![self.codec.clone()];
     if let Some(rate) = self.bit_rate {
+      // bit/s -> kbps
       items.push(format!("{} kbps", (rate + 500) / 1000));
     }
     items.push(format!("{} Hz", self.sample_rate));
@@ -107,7 +108,9 @@ impl Decoder {
       None => file_size.map(|size| (size as f64 * 8.0 / duration) as u32),
     };
 
-    let decoder = codecs.make_audio_decoder(params, &AudioDecoderOptions::default()).map_err(Error::NoDecoder)?;
+    let decoder = codecs
+      .make_audio_decoder(params, &AudioDecoderOptions::default())
+      .map_err(Error::NoDecoder)?;
     let track_id = track.id;
 
     Ok(Self {
@@ -126,7 +129,7 @@ impl Decoder {
       let packet = match self.format.next_packet() {
         Ok(Some(packet)) => packet,
         Ok(None) => return Ok(None),
-        // A chained stream changed its track list; treat it as the end, like Spek.
+        // A chained stream changed its track list; treat it as the end.
         Err(SymphoniaError::ResetRequired) => return Ok(None),
         Err(SymphoniaError::IoError(e)) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
           return Ok(None);

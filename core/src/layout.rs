@@ -1,7 +1,7 @@
-//! Spek's page geometry, shared by every front end so they agree on where the
+//! Page layout, shared by every front end so they agree on where the
 //! spectrogram, header and colour bar go. Units are logical pixels.
 
-/// Space around the spectrogram, as in Spek.
+/// Space around the spectrogram
 pub const LEFT: f32 = 60.0;
 pub const TOP: f32 = 60.0;
 pub const RIGHT: f32 = 90.0;
@@ -13,7 +13,7 @@ pub const BAR: f32 = 10.0;
 /// Length of an axis tick mark.
 pub const TICK: f32 = 4.0;
 
-/// Font sizes in pixels (Spek's point sizes, scaled as it does on macOS).
+/// Font sizes in pixels.
 pub const TITLE_SIZE: f32 = 13.0;
 pub const BODY_SIZE: f32 = 12.0;
 pub const LABEL_SIZE: f32 = 10.0;
@@ -51,12 +51,22 @@ pub struct Layout {
 
 impl Layout {
   pub fn new(width: f32, height: f32) -> Self {
-    let plot =
-      Rect { x: LEFT, y: TOP, width: (width - LEFT - RIGHT).max(0.0), height: (height - TOP - BOTTOM).max(0.0) };
+    let plot = Rect {
+      x: LEFT,
+      y: TOP,
+      width: (width - LEFT - RIGHT).max(0.0),
+      height: (height - TOP - BOTTOM).max(0.0),
+    };
     let bar = Rect { x: plot.right() + GAP, y: TOP, width: BAR, height: plot.height };
     let description_y = TOP - GAP - BODY_SIZE * 1.2;
     let title_y = description_y - GAP - TITLE_SIZE * 1.2;
-    Self { plot, bar, title: (LEFT, title_y), description: (LEFT, description_y), app_name: (bar.x, title_y) }
+    Self {
+      plot,
+      bar,
+      title: (LEFT, title_y),
+      description: (LEFT, description_y),
+      app_name: (bar.x, title_y),
+    }
   }
 
   /// How many spectrogram columns fit the plot at 1:1.

@@ -7,8 +7,8 @@ use specal_core::{Columns, DbRange, Palette, Settings, WindowFunction, svg};
 
 /// Render an audio file's spectrogram.
 ///
-/// `.svg` output gets Spek-style axes, labels and a colour bar. `.png` output
-/// is the bare spectrogram, one pixel per column and frequency band.
+/// `.svg` output gets axes, labels and a colour bar. `.png` output is the bare
+/// spectrogram, one pixel per column and frequency band.
 #[derive(Parser)]
 #[command(version)]
 struct Args {
@@ -86,7 +86,11 @@ fn main() -> Result<()> {
   };
   let range = DbRange { lower: args.lower, upper: args.upper };
 
-  let columns = if is_png { args.width as usize } else { Layout::new(args.width as f32, args.height as f32).columns() };
+  let columns = if is_png {
+    args.width as usize
+  } else {
+    Layout::new(args.width as f32, args.height as f32).columns()
+  };
   let analysis = specal_core::analyse(&args.input, &settings, Columns::Exact(columns))
     .with_context(|| format!("analysing {}", args.input.display()))?;
 

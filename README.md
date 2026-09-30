@@ -13,7 +13,7 @@ A Rust re-implementation of [Spek](https://github.com/alexkay/spek), the acousti
 ## Usage
 
 ```sh
-cargo run --release -p specal -- track.flac -o track.svg        # Spek-style image with axes
+cargo run --release -p specal -- track.flac -o track.svg        # Svg spectrogram with axes
 cargo run --release -p specal -- track.flac -o track.png        # bare spectrogram
 cargo run --release -p specal -- --help                         # palette, window, FFT size, dB range...
 

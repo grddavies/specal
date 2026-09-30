@@ -1,9 +1,10 @@
-//! Audio spectrum analysis, ported from [Spek](https://github.com/alexkay/spek).
+//! specal-core: Audio Spectrum Analysis
 //!
-//! This crate knows nothing about windows or drawing. It turns an audio file into
-//! a [`Spectrogram`] (a grid of dB values) plus the [`AudioInfo`] needed to label it,
-//! and provides the geometry ([`layout`], [`ticks`]) that front ends use to draw
-//! axes themselves. The optional `svg` feature adds a standalone SVG exporter.
+//! This crate turns an audio file into a [`Spectrogram`] (a grid of dB values) plus the
+//! [`AudioInfo`] needed to label it, and provides the geometry ([`layout`], [`ticks`]) that front
+//! ends use to draw axes themselves.
+//!
+//! The optional `svg` feature adds a standalone SVG exporter.
 
 mod analysis;
 mod audio;
@@ -16,16 +17,17 @@ pub mod ticks;
 use std::path::PathBuf;
 
 pub use analysis::{
-  Analysis, Columns, MAX_AUTO_COLUMNS, MIN_AUTO_COLUMNS, Spectrogram, WindowFunction, analyse, analyse_cancellable,
+  Analysis, Columns, MAX_AUTO_COLUMNS, MIN_AUTO_COLUMNS, Spectrogram, WindowFunction, analyse,
+  analyse_cancellable,
 };
 pub use audio::AudioInfo;
 pub use palette::Palette;
 
-/// FFT size limits, as `log2(window length)`. Matches Spek's `W` key range.
+/// FFT size limits, as `log2(window length)`.
 pub const MIN_FFT_BITS: u32 = 8;
 pub const MAX_FFT_BITS: u32 = 14;
 
-/// Analysis settings. The defaults match Spek's.
+/// Analysis settings.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Settings {
   /// Which channel to analyse (0-based).

@@ -1,5 +1,5 @@
 //! Standalone SVG export: the spectrogram and colour bar as embedded PNGs,
-//! with vector axes, ticks and text laid out like Spek.
+//! with vector axes, ticks and text
 
 use std::fmt::Write;
 use std::io::Cursor;
@@ -78,7 +78,11 @@ pub fn render(analysis: &Analysis, opts: &Options) -> String {
     embed_image(&mut s, &opts.palette.bar(256), &bar);
 
     let _ = writeln!(s, r#"<g stroke="white" stroke-width="1" fill="none">"#);
-    let _ = writeln!(s, r#"<rect x="{}" y="{}" width="{}" height="{}"/>"#, plot.x, plot.y, plot.width, plot.height);
+    let _ = writeln!(
+      s,
+      r#"<rect x="{}" y="{}" width="{}" height="{}"/>"#,
+      plot.x, plot.y, plot.width, plot.height
+    );
     let _ = writeln!(s, "</g>");
 
     let _ = writeln!(s, r#"<g font-size="{}">"#, layout::LABEL_SIZE);
@@ -114,7 +118,12 @@ pub fn render(analysis: &Analysis, opts: &Options) -> String {
       let x = bar.right();
       let y = bar.bottom() - t.pos * bar.height;
       tick_line(&mut s, x, y, x + layout::TICK, y);
-      let _ = writeln!(s, r#"<text x="{}" y="{y}" dominant-baseline="central">{}</text>"#, x + layout::GAP, t.label);
+      let _ = writeln!(
+        s,
+        r#"<text x="{}" y="{y}" dominant-baseline="central">{}</text>"#,
+        x + layout::GAP,
+        t.label
+      );
     }
 
     let _ = writeln!(s, "</g>");
@@ -142,7 +151,8 @@ fn tick_line(s: &mut String, x1: f32, y1: f32, x2: f32, y2: f32) {
 
 /// Encode an [`Rgba`] image as PNG bytes.
 pub fn encode_png(img: &Rgba) -> Vec<u8> {
-  let buf = RgbaImage::from_raw(img.width, img.height, img.pixels.clone()).expect("pixel buffer matches dimensions");
+  let buf = RgbaImage::from_raw(img.width, img.height, img.pixels.clone())
+    .expect("pixel buffer matches dimensions");
   let mut out = Cursor::new(Vec::new());
   buf.write_to(&mut out, ImageFormat::Png).expect("PNG encoding to memory cannot fail");
   out.into_inner()

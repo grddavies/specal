@@ -1,4 +1,4 @@
-//! Colour maps from a normalised level (0..=1) to RGB, ported from Spek.
+//! Colour maps from a normalised level (0..=1) to RGB
 
 use std::f64::consts::PI;
 use std::fmt;
