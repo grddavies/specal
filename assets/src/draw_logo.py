@@ -74,5 +74,27 @@ icon = (
     + "  </g>\n</svg>\n"
 )
 
+# dmg window background, 540x360 to match `make dmg`. Light, since Finder draws icon
+# labels in black. Plates sit behind the icon centres (140,170) and (400,170).
+def plate(cx):
+    return f'  <rect x="{cx - 80}" y="95" width="160" height="172" rx="28" fill="#fff" filter="url(#plate)"/>\n'
+
+
+dmg_bg = f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 540 360" width="540" height="360">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FAFBFC"/>
+      <stop offset="1" stop-color="#E6E9EF"/>
+    </linearGradient>
+    <filter id="plate" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#1D2433" flood-opacity="0.14"/>
+    </filter>
+  </defs>
+  <rect width="540" height="360" fill="url(#bg)"/>
+{plate(140)}{plate(400)}  <path d="M 240 170 H 294 M 278 153 L 296 170 L 278 187" fill="none" stroke="{PINK}" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
+'''
+
 open(OUT + "/logo.svg", "w").write(svg)
 open(OUT + "/icon-macos.svg", "w").write(icon)
+open(OUT + "/dmg-background.svg", "w").write(dmg_bg)
