@@ -30,10 +30,11 @@ LINE = f'  <line x1="{lx(28):.1f}" y1="28" x2="{lx(292):.1f}" y2="292" stroke="{
 
 # spectrogram colour by y position
 def tone(y):
-    return PORC if y < 110 else PALE if y < 160 else PINK if y < 215 else BLUE
+    return BLUE if y < 130 else PINK if y < 180 else PALE if y < 245 else PORC
 
 
-H = [2, 4, 6, 4, 8, 6, 8, 4, 2]
+# Waveform/spectrogram bar heights
+H = [2, 4, 6, 4, 8, 6, 8, 4, 6]
 bars, cells = "", ""
 for i, n in enumerate(H):
     x = X0 + i * PITCH
@@ -41,7 +42,8 @@ for i, n in enumerate(H):
     bars += f'    <rect x="{x:g}" y="{160 - h / 2:g}" width="{W_}" height="{h}" rx="5" fill="{PORC}"/>\n'
     ys = {160 - n * PITCH / 2 + k * PITCH + 4 for k in range(n)} | {220, 248}
     for y in sorted(ys):
-        cells += f'    <rect x="{x:g}" y="{y:g}" width="{W_}" height="{W_}" rx="5" fill="{tone(y + 10)}"/>\n'
+        fill = PORC if y > 245 else tone(y + 10 - (i % 3) * 20)
+        cells += f'    <rect x="{x:g}" y="{y:g}" width="{W_}" height="{W_}" rx="5" fill="{fill}"/>\n'
 BODY = (
     f'  <rect width="320" height="320" rx="72" fill="{INK}"/>\n  <g clip-path="url(#time)">\n{bars}  </g>\n  <g clip-path="url(#freq)">\n{cells}  </g>\n'
     + LINE
@@ -73,6 +75,7 @@ icon = (
     + BODY
     + "  </g>\n</svg>\n"
 )
+
 
 # dmg window background, 540x360 to match `make dmg`. Light, since Finder draws icon
 # labels in black. Plates sit behind the icon centres (140,170) and (400,170).
