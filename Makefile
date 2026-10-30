@@ -32,6 +32,9 @@ icon: $(ICNS)
 
 app: $(ICNS)
 	cd gui && cargo bundle --release --format osx
+	# rename the executable to match the app name
+	mv $(APP)/Contents/MacOS/specal-gui $(APP)/Contents/MacOS/Specal
+	/usr/libexec/PlistBuddy -c "Set :CFBundleExecutable Specal" $(APP)/Contents/Info.plist
 	@echo "built $(APP)"
 
 # 1x + 2x in one tiff so the background is sharp on retina
