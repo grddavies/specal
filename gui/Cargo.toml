@@ -7,3 +7,14 @@ license.workspace = true
 [dependencies]
 specal-core.workspace = true
 iced = { version = "0.14.0", features = ["image", "canvas"] }
+
+[package.metadata.bundle]
+name = "Specal"
+identifier = "io.github.grddavies.specal"
+icon = ["../assets/AppIcon.icns"]
+version = "0.1.0"
+category = "public.app-category.music"
+short_description = "Acoustic spectrum analyser"
+
+[package.metadata.bundle.osx]
+minimum_system_version = "11.0"
