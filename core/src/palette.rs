@@ -18,10 +18,12 @@ pub enum Palette {
   Sox,
   /// Greyscale.
   Mono,
+  /// Specal colour scheme
+  Specal,
 }
 
 impl Palette {
-  pub const ALL: [Palette; 3] = [Self::Spectrum, Self::Sox, Self::Mono];
+  pub const ALL: [Palette; 4] = [Self::Spectrum, Self::Sox, Self::Mono, Self::Specal];
 
   pub fn color(self, level: f32) -> [u8; 3] {
     let level = level.clamp(0.0, 1.0) as f64;
@@ -29,6 +31,7 @@ impl Palette {
       Self::Spectrum => spectrum(level),
       Self::Sox => sox(level),
       Self::Mono => (level, level, level),
+      Self::Specal => gradient(&SPECAL_STOPS, level),
     };
     [r, g, b].map(|c| (c * 255.0 + 0.5) as u8)
   }
@@ -52,8 +55,32 @@ impl fmt::Display for Palette {
       Self::Spectrum => "Spectrum",
       Self::Sox => "SoX",
       Self::Mono => "Mono",
+      Self::Specal => "Specal",
     })
   }
+}
+
+/// Colour stops for the Specal palette as (level, rgb)
+const SPECAL_STOPS: [(f64, [u8; 3]); 6] = [
+  (0.00, [0x00, 0x00, 0x00]), // black #000000
+  (0.15, [0x0D, 0x18, 0x21]), // ink   #0D1821
+  (0.35, [0x71, 0x61, 0xEF]), // blue  #7161EF
+  (0.50, [0xF7, 0x86, 0xAA]), // pink  #F786AA
+  (0.70, [0xFB, 0xCA, 0xDA]), // pale  #FBCADA
+  (1.00, [0xF0, 0xF4, 0xEF]), // porc  #F0F4EF
+];
+
+/// Linearly interpolate between `stops` (level, rgb) for a level in 0..=1.
+fn gradient(stops: &[(f64, [u8; 3])], level: f64) -> (f64, f64, f64) {
+  let level = level.clamp(0.0, 1.0);
+  // First stop above `level`; the segment is the pair around it.
+  let hi = stops.iter().position(|&(p, _)| p > level).unwrap_or(stops.len() - 1).max(1);
+  let (p0, c0) = stops[hi - 1];
+  let (p1, c1) = stops[hi];
+  let t = ((level - p0) / (p1 - p0)).clamp(0.0, 1.0);
+  let [r, g, b] =
+    std::array::from_fn(|c| (c0[c] as f64 + (c1[c] as f64 - c0[c] as f64) * t) / 255.0);
+  (r, g, b)
 }
 
 fn spectrum(level: f64) -> (f64, f64, f64) {
@@ -111,5 +138,8 @@ mod tests {
     assert_eq!(Palette::Sox.color(1.0), [255, 255, 255]);
     assert_eq!(Palette::Mono.color(1.0), [255, 255, 255]);
     assert_eq!(Palette::Spectrum.color(0.0), [0, 0, 0]);
+    assert_eq!(Palette::Specal.color(0.0), [0x0D, 0x18, 0x21]);
+    assert_eq!(Palette::Specal.color(0.30), [0x71, 0x61, 0xEF]);
+    assert_eq!(Palette::Specal.color(1.0), [0xF0, 0xF4, 0xEF]);
   }
 }

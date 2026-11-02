@@ -52,6 +52,7 @@ enum PaletteArg {
   Spectrum,
   Sox,
   Mono,
+  Specal,
 }
 
 fn main() -> Result<()> {
@@ -83,6 +84,7 @@ fn main() -> Result<()> {
     PaletteArg::Spectrum => Palette::Spectrum,
     PaletteArg::Sox => Palette::Sox,
     PaletteArg::Mono => Palette::Mono,
+    PaletteArg::Specal => Palette::Specal,
   };
   let range = DbRange { lower: args.lower, upper: args.upper };
 
