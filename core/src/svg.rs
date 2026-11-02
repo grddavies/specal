@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Gethin Davies
+// Derived in part from Spek <https://github.com/alexkay/spek>
+
 //! Standalone SVG export: the spectrogram and colour bar as embedded PNGs,
 //! with vector axes, ticks and text
 

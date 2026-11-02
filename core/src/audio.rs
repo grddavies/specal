@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Gethin Davies
+// Derived in part from Spek <https://github.com/alexkay/spek>
+
 //! Decoding with symphonia: file metadata plus a stream of samples for one channel.
 
 use std::fs::File;

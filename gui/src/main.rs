@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Gethin Davies
+// Derived in part from Spek <https://github.com/alexkay/spek>
+
 //! Minimal iced front end: drop an audio file on the window to see its spectrogram.
 
 use std::path::{Path, PathBuf};

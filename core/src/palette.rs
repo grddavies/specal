@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Gethin Davies
+// Derived in part from Spek <https://github.com/alexkay/spek>
+
 //! Colour maps from a normalised level (0..=1) to RGB
 
 use std::f64::consts::PI;

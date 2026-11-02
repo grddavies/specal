@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Gethin Davies
+// Derived in part from Spek <https://github.com/alexkay/spek>
+
 //! Short-time FFT over the whole file, reduced to a fixed number of columns.
 //!
 //! The file is split into `columns` equal intervals. Each interval gets one FFT
@@ -67,7 +71,9 @@ impl WindowFunction {
         match self {
           Self::Hann => 0.5 * (1.0 - x.cos()),
           Self::Hamming => 0.53836 - 0.46164 * x.cos(),
-          Self::BlackmanHarris => 0.35875 - 0.48829 * x.cos() + 0.14128 * (2.0 * x).cos() - 0.01168 * (3.0 * x).cos(),
+          Self::BlackmanHarris => {
+            0.35875 - 0.48829 * x.cos() + 0.14128 * (2.0 * x).cos() - 0.01168 * (3.0 * x).cos()
+          }
         }
       })
       .collect()
@@ -124,7 +130,8 @@ impl Spectrogram {
     Spectrogram { columns, bands: self.bands, data }
   }
 
-  /// Render to an image `columns` wide and `bands` tall, highest frequency at the top.
+  /// Render to an image `columns` wide and `bands` tall, highest frequency at
+  /// the top.
   pub fn to_rgba(&self, palette: Palette, range: DbRange) -> Rgba {
     let (w, h) = (self.columns, self.bands);
     // The palette maths is too slow to run per pixel, so precompute a lookup table.
@@ -173,7 +180,8 @@ pub fn analyse(path: &Path, settings: &Settings, columns: Columns) -> Result<Ana
   analyse_cancellable(path, settings, columns, &AtomicBool::new(false))
 }
 
-/// Like [`analyse`], but returns [`Error::Cancelled`] soon after `cancel` is set.
+/// Like [`analyse`], but returns [`Error::Cancelled`] soon after `cancel` is
+/// set.
 pub fn analyse_cancellable(
   path: &Path,
   settings: &Settings,
@@ -345,7 +353,8 @@ mod tests {
   #[test]
   fn sine_peaks_in_the_right_band() {
     let (rate, freq, n) = (48_000.0, 6_000.0, 1024);
-    let samples: Vec<f32> = (0..48_000).map(|i| (2.0 * PI * freq * i as f32 / rate).sin()).collect();
+    let samples: Vec<f32> =
+      (0..48_000).map(|i| (2.0 * PI * freq * i as f32 / rate).sin()).collect();
     let spec = run(&samples, 10, 10);
     assert_eq!(spec.bands, n / 2 + 1);
     let expected_band = (freq / rate * n as f32).round() as usize;
@@ -358,7 +367,8 @@ mod tests {
 
   #[test]
   fn rebin_averages_covered_columns() {
-    let spec = Spectrogram { columns: 4, bands: 2, data: vec![0.0, 10.0, 2.0, 20.0, 4.0, 30.0, 6.0, 40.0] };
+    let spec =
+      Spectrogram { columns: 4, bands: 2, data: vec![0.0, 10.0, 2.0, 20.0, 4.0, 30.0, 6.0, 40.0] };
     let half = spec.rebin(2);
     assert_eq!(half.columns, 2);
     assert_eq!(half.data, [1.0, 15.0, 5.0, 35.0]);

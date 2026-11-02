@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Gethin Davies
+// Derived in part from Spek <https://github.com/alexkay/spek>
+
 //! specal-core: Audio Spectrum Analysis
 //!
 //! This crate turns an audio file into a [`Spectrogram`] (a grid of dB values) plus the

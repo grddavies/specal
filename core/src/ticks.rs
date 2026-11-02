@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Gethin Davies
+// Derived in part from Spek <https://github.com/alexkay/spek>
+
 //! Where to put axis ticks and what to label them
 //!
 //! These functions only do the maths; drawing is up to the front end. Each

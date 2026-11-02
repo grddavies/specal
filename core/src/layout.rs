@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Gethin Davies
+// Derived in part from Spek <https://github.com/alexkay/spek>
+
 //! Page layout, shared by every front end so they agree on where the
 //! spectrogram, header and colour bar go. Units are logical pixels.
 
