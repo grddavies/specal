@@ -3,6 +3,13 @@ name = "specal-gui"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+authors.workspace = true
+repository.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "Acoustic spectrum analyser"
+publish = false
 
 [dependencies]
 specal-core.workspace = true

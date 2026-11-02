@@ -6,6 +6,11 @@ members = ["core", "cli", "gui"]
 version = "0.1.0"
 edition = "2024"
 license = "GPL-3.0-or-later"
+authors = ["Gethin Davies <grd.davies@gmail.com>"]
+repository = "https://github.com/grddavies/specal"
+readme = "README.md"
+keywords = ["audio", "spectrogram", "spectrum", "fft"]
+categories = ["multimedia::audio"]
 
 [workspace.dependencies]
 specal-core = { path = "core", default-features = false }
