@@ -11,6 +11,8 @@ A Rust re-implementation of <a href="https://github.com/alexkay/spek">Spek</a>, 
 
 ## Usage
 
+![Specal showing a spectrogram](assets/screenshot.png)
+
 ### Keymaps
 
 | Key       | Action                                                 |
@@ -54,7 +56,7 @@ cargo test --workspace
 
 Specal is a Rust re-implementation of [Spek](https://github.com/alexkay/spek) by Alexander Kojevnikov and contributors. The analysis approach, page layout, axis tick selection, keyboard shortcuts and palettes are ported from Spek, and some source files are derived from it. Spek is licensed under the GPL-3.0-or-later, and Specal is released under the same licence.
 
-The palettes also build on earlier work: the *Spectrum* palette is a modified version of [Dan Bruton's algorithm](http://www.physics.sfasu.edu/astro/color/spectra.html), and the *SoX* palette comes from [SoX](https://sox.sourceforge.net/) by Rob Sykes.
+The palettes also build on earlier work: the _Spectrum_ palette is a modified version of [Dan Bruton's algorithm](http://www.physics.sfasu.edu/astro/color/spectra.html), and the _SoX_ palette comes from [SoX](https://sox.sourceforge.net/) by Rob Sykes.
 
 Audio decoding uses [Symphonia](https://github.com/pdeljanov/Symphonia), the FFT uses [RealFFT](https://github.com/HEnquist/realfft), and the GUI uses [iced](https://github.com/iced-rs/iced).
 
