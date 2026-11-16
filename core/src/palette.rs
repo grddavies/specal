@@ -138,8 +138,9 @@ mod tests {
     assert_eq!(Palette::Sox.color(1.0), [255, 255, 255]);
     assert_eq!(Palette::Mono.color(1.0), [255, 255, 255]);
     assert_eq!(Palette::Spectrum.color(0.0), [0, 0, 0]);
-    assert_eq!(Palette::Specal.color(0.0), [0x0D, 0x18, 0x21]);
-    assert_eq!(Palette::Specal.color(0.30), [0x71, 0x61, 0xEF]);
+    assert_eq!(Palette::Specal.color(0.0), [0x00, 0x00, 0x00]);
+    assert_eq!(Palette::Specal.color(0.15), [0x0D, 0x18, 0x21]);
+    assert_eq!(Palette::Specal.color(0.35), [0x71, 0x61, 0xEF]);
     assert_eq!(Palette::Specal.color(1.0), [0xF0, 0xF4, 0xEF]);
   }
 }
